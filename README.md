@@ -1,5 +1,18 @@
 # wbor-llm
 
+Implements an SMS-based assistant for WBOR 91.1 FM. Listeners can send an SMS to the station's dedicated phone number to inquire about the song currently playing.
+
+The backend is a Python microservice built with FastAPI, designed to be containerized using Docker. It leverages the LangChain framework to create an intelligent agent powered by an OpenAI language model (e.g., GPT-3.5-turbo). This agent processes incoming SMS messages (via a webhook from a service like Twilio), understands the user's intent, and uses a custom tool to fetch the latest song information from [WBOR's public API](https://api-1.wbor.org/api/spins?count=1).
+
+The service includes:
+
+* An API endpoint (/process-sms) to receive SMS content.
+* A custom LangChain tool (GetCurrentSongTool) to interact with the WBOR API.
+* An OpenAI Functions Agent to orchestrate the interaction and formulate responses.
+* A health check endpoint (/health).
+* Integration with LangSmith for tracing and debugging agent behavior.
+* The goal is to provide a quick and convenient way for listeners to identify songs they hear on WBOR.
+
 ## Usage
 
 1. **Set Environment Variables:**
@@ -56,3 +69,28 @@
     * "What was the last song?" (after asking "What song is playing?")
     * "What album was the last song from?" (after asking "What song is playing?")
   * Simple storage mechanism to keep track of the last few songs played.
+* GetNLastSongTool
+  * Add a tool to get the last N songs played.
+  * This will be useful for users who want to know what songs have been played recently as opposed to just the current song.
+    * Input: Optional number of songs or time window
+    * Output: List
+    * Option to ask "What was two songs ago?" or "What was the last song played?" to query from the list.
+* GetSongInfoTool
+  * Add a tool to get information about a song.
+  * This will be useful for users who want to know more about a specific song.
+    * Input: Song name
+    * Output: Information about the song (e.g., artist, album, release date)
+* MakeSongRequestTool
+  * Add a tool to submit a song request to the live DJ.
+  * This will be useful for users who want to request a specific song to be played.
+    * Input: Song name
+    * Output: Confirmation of the request
+    * Backend: Submit the request to the live DJ via a web form or API.
+* GetStationInfoTool
+  * Add a tool to get information about the radio station.
+  * This will be useful for users who want to know more about the station.
+    * Input: None
+    * Output: Information about the station (e.g., name, frequency, website)
+* Feedback Mechanism
+  * Add a feedback mechanism to allow users to provide feedback on the service (e.g., "Was this helpful?").
+  * Log feedback in LangSmith to evaluate and improve performance.
