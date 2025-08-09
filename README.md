@@ -1,17 +1,16 @@
 # wbor-llm
 
-Implements an SMS-based assistant for WBOR 91.1 FM. Listeners can send an SMS to the station's dedicated phone number to inquire about the song currently playing.
+SMS-based assistant for WBOR 91.1 FM. Listeners text the station's phone number to inquire about the song currently playing, and the assistant responds with the song title and artist.
 
-The backend is a Python microservice built with FastAPI, designed to be containerized using Docker. It leverages the LangChain framework to create an intelligent agent powered by an OpenAI language model (e.g., GPT-3.5-turbo). This agent processes incoming SMS messages (via a webhook from a service like Twilio), understands the user's intent, and uses a custom tool to fetch the latest song information from [WBOR's public API](https://api-1.wbor.org/api/spins?count=1).
+Python microservice built with FastAPI, containerized using Docker. Leverages LangChain to create an intelligent agent powered by an OpenAI language model (e.g., GPT-3.5-turbo). Processes incoming SMS messages (via a webhook from a service like Twilio), determines the user's intent, and uses a custom tool to fetch the latest song information from [WBOR's API](https://api-1.wbor.org/api/spins?count=1).
 
-The service includes:
+Includes:
 
-* An API endpoint (/process-sms) to receive SMS content.
-* A custom LangChain tool (GetCurrentSongTool) to interact with the WBOR API.
-* An OpenAI Functions Agent to orchestrate the interaction and formulate responses.
-* A health check endpoint (/health).
-* Integration with LangSmith for tracing and debugging agent behavior.
-* The goal is to provide a quick and convenient way for listeners to identify songs they hear on WBOR.
+* An API endpoint (`/process-sms`) to receive SMS content.
+* A tool (`GetCurrentSongTool`) to interact with the WBOR API.
+* OpenAI Functions Agent to orchestrate the interaction and formulate responses.
+* A health check endpoint (`/health`).
+* Integration with [LangSmith](https://www.langchain.com/langsmith) for tracing/observability.
 
 ## Usage
 
@@ -28,13 +27,13 @@ The service includes:
     * Run: `python main.py`
     * The API will be available at `http://localhost:8000`. You can test with tools like `curl` or Postman:
 
-        ```bash
+        ```shell
         curl -X POST "http://localhost:8000/process-sms" \
              -H "Content-Type: application/json" \
              -d '{"sms_body":"what song is playing?"}'
         ```
 
-        ```bash
+        ```shell
         curl http://localhost:8000/health
         ```
 
@@ -42,7 +41,7 @@ The service includes:
     * Build the image: `docker build -t wbor-sms-agent .`
     * Run the container:
 
-        ```bash
+        ```shell
         docker run -d -p 8080:8000 \
                -e OPENAI_API_KEY="your_actual_openai_api_key" \
                -e LANGSMITH_TRACING="true" \
@@ -52,15 +51,15 @@ The service includes:
                wbor-sms-agent
         ```
 
-        Now the service will be accessible at `http://localhost:8080`.
+        The service will be accessible at `http://localhost:8080`.
 
-## Future Directions
+## Future Directions for Development
 
 * Sophisticated intent recognition and handling:
   * Wider variety of ways a user might ask for the current song. LandSmith data will help with this.
   * Handle ambiguous requests. Instead of "I don't know", offer hints or ask clarifying questions.
   * Handle negative queries (e.g., "What song is NOT playing?").
-* Improve GetCurrentSongTool
+* Improve `GetCurrentSongTool`
   * Make asynchronous
   * Cache song information for a short period with the option to use the proxy's SSE channel to make real-time evicts.
 * Chat history
@@ -69,24 +68,24 @@ The service includes:
     * "What was the last song?" (after asking "What song is playing?")
     * "What album was the last song from?" (after asking "What song is playing?")
   * Simple storage mechanism to keep track of the last few songs played.
-* GetNLastSongTool
+* `GetNLastSongTool`
   * Add a tool to get the last N songs played.
   * This will be useful for users who want to know what songs have been played recently as opposed to just the current song.
     * Input: Optional number of songs or time window
     * Output: List
     * Option to ask "What was two songs ago?" or "What was the last song played?" to query from the list.
-* GetSongInfoTool
+* `GetSongInfoTool`
   * Add a tool to get information about a song.
   * This will be useful for users who want to know more about a specific song.
     * Input: Song name
     * Output: Information about the song (e.g., artist, album, release date)
-* MakeSongRequestTool
+* `MakeSongRequestTool`
   * Add a tool to submit a song request to the live DJ.
   * This will be useful for users who want to request a specific song to be played.
     * Input: Song name
     * Output: Confirmation of the request
     * Backend: Submit the request to the live DJ via a web form or API.
-* GetStationInfoTool
+* `GetStationInfoTool`
   * Add a tool to get information about the radio station.
   * This will be useful for users who want to know more about the station.
     * Input: None

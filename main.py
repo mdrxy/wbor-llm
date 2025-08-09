@@ -1,12 +1,3 @@
-"""
-FastAPI application to process SMS messages using LangChain and OpenAI.
-
-This application listens for incoming SMS messages, determines if the
-user is asking about the currently playing song on WBOR 91.1 FM, and
-uses LangChain's OpenAI Functions agent to fetch the song details
-from the station's public API.
-"""
-
 import logging
 import os
 from contextlib import asynccontextmanager
@@ -19,21 +10,16 @@ from langchain.agents import AgentExecutor, create_openai_functions_agent
 from langchain.tools import BaseTool
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_openai import ChatOpenAI
-from pydantic import (  # Field can be used if you add fields to GetCurrentSongInput
-    BaseModel,
-    Field,
-)
+from pydantic import BaseModel
 
 # Configure basic logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# --- Environment Variable Checks (Corrected LangSmith variable) ---
 if not os.getenv("OPENAI_API_KEY"):
     logger.warning(
         "OPENAI_API_KEY environment variable not set. The agent will not function."
     )
-# Standard LangChain environment variable for LangSmith tracing
 if os.getenv("LANGSMITH_TRACING") == "true" and not os.getenv("LANGSMITH_API_KEY"):
     logger.warning(
         "LANGSMITH_TRACING is true, but LANGSMITH_API_KEY is not set. Tracing will likely fail."
@@ -52,21 +38,17 @@ elif not os.getenv(
     )
 
 
-# --- Custom LangChain Tool: GetCurrentSongTool ---
-class GetCurrentSongInput(BaseModel):  # Inherit from pydantic.BaseModel
+class GetCurrentSongInput(BaseModel):
     """
     Input for GetCurrentSongTool.
     This tool requires no specific input arguments from the LLM when
     called.
     """
 
-    # No input fields needed for this tool
-
 
 class GetCurrentSongTool(BaseTool):
     """
-    Defines a tool to fetch the currently playing song from WBOR 91.1
-    FM's public API.
+    Fetch the currently playing song from WBOR 91.1 FM's public API.
     """
 
     name: str = "get_current_song"
@@ -78,7 +60,7 @@ class GetCurrentSongTool(BaseTool):
 
     def _run(self, *args: Any, **kwargs: Any) -> str:
         """
-        Execute the tool to get current song information.
+        Fetch current song information from API.
         """
         api_url = "https://api-1.wbor.org/api/spins?count=1"
         try:
@@ -130,8 +112,7 @@ class GetCurrentSongTool(BaseTool):
 
     async def _arun(self, *args: Any, **kwargs: Any) -> str:
         # For simplicity, using the synchronous run method.
-        # For a production application, consider implementing true async HTTP requests
-        # using a library like `httpx`.
+        # TODO; true async HTTP requests using httpx.
         return self._run(*args, **kwargs)
 
 
@@ -155,7 +136,8 @@ async def lifespan(_app: FastAPI):
         logger.error(
             "CRITICAL: OPENAI_API_KEY is not set. Agent cannot be initialized."
         )
-        # Application will start, but /process-sms will fail. Health check will reflect this.
+        # Application will start, but /process-sms will fail.
+        # (Health check will reflect this.)
         LLM_INSTANCE = None
         AGENT_EXECUTOR = None
     else:
@@ -164,16 +146,18 @@ async def lifespan(_app: FastAPI):
             tools = [GetCurrentSongTool()]
 
             system_prompt = (
-                "You are a helpful assistant for WBOR 91.1 FM at Bowdoin College in Brunswick, "
-                "Maine. Your primary function is to tell users what song is currently playing if "
-                "they ask. Use the 'get_current_song' tool to find this information. If the user "
-                "asks about something other than the current song, politely inform them you can "
-                "only provide information about the currently playing song. If they don't ask a "
-                "question, tell them thanks for listening and that they can ask. If you don't "
-                "understand them, let them know. If the 'get_current_song' tool encounters an "
-                "error or returns no specific song information, inform the user that you couldn't "
-                "fetch the song details at this moment and suggest they could try again later. "
-                "Limit excess prose, be direct."
+                "You are a helpful assistant for WBOR 91.1 FM at Bowdoin College in "
+                "Brunswick, Maine. Your primary function is to tell users what song is "
+                "currently playing if they ask. Use the 'get_current_song' tool to "
+                "find this information. If the user asks about something other than "
+                "the current song, politely inform them you can only provide "
+                "information about the currently playing song. If they don't ask a "
+                "question, tell them thanks for listening and that they can ask. If "
+                "you don't understand them, let them know. If the 'get_current_song' "
+                "tool encounters an error or returns no specific song information, "
+                "inform the user that you couldn't fetch the song details at this "
+                "moment and suggest they could try again later. Limit excess prose, be "
+                "direct."
             )
             prompt = ChatPromptTemplate.from_messages(
                 [
@@ -186,14 +170,14 @@ async def lifespan(_app: FastAPI):
             agent = create_openai_functions_agent(LLM_INSTANCE, tools, prompt)
             AGENT_EXECUTOR = AgentExecutor(
                 agent=agent, tools=tools, verbose=True
-            )  # Set verbose to False in production
+            )  # (Set verbose to False in production)
             logger.info("LangChain OpenAI Functions Agent initialized successfully.")
-        except Exception as e:  # pylint: disable=broad-except
+        except Exception as e:
             logger.error("Failed to initialize LangChain agent: %s", e, exc_info=True)
             LLM_INSTANCE = None
             AGENT_EXECUTOR = None
 
-    yield  # Application runs here
+    yield  # Run app
 
     logger.info("Application shutdown: Cleaning up resources (if any)...")
     # Add any cleanup code here if needed
@@ -204,7 +188,7 @@ app = FastAPI(
     title="WBOR LangChain SMS Agent",
     description="Processes SMS messages to answer questions about the currently playing song.",
     version="0.1.0",
-    lifespan=lifespan,  # Use the new lifespan context manager
+    lifespan=lifespan,
 )
 
 
@@ -229,16 +213,14 @@ class AgentResponse(BaseModel):
 
 
 @app.post("/process-sms", response_model=AgentResponse)
-async def process_sms_endpoint(
-    request_body: SMSRequest, _request: Request
-):  # Renamed to avoid conflict with any 'process_sms' var
+async def process_sms_endpoint(request_body: SMSRequest, _request: Request):
     """
-    Processes an incoming SMS message using the LangChain agent.
+    Process incoming SMS messages using LangChain.
     """
-    if not AGENT_EXECUTOR:  # Check the global AGENT_EXECUTOR
+    if not AGENT_EXECUTOR:
         logger.error("Agent not initialized. Cannot process request.")
         raise HTTPException(
-            status_code=503,  # Service Unavailable
+            status_code=503,
             detail="Agent service is not available. Please check server logs.",
         )
 
@@ -254,7 +236,7 @@ async def process_sms_endpoint(
                 "project_name": os.getenv("LANGSMITH_PROJECT", "WBOR SMS Agent Default")
             }
         }
-        # Example of how to pass a run_id if you have one from an upstream service
+        # Example of how to pass a run_id if provided upstream
         # langsmith_run_id = request.headers.get("x-langsmith-run-id")
         # if langsmith_run_id:
         #     config["configurable"]["run_id"] = langsmith_run_id
